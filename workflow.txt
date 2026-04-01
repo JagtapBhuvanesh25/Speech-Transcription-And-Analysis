@@ -1,0 +1,19 @@
+User uploads audio (Flask UI)
+        ↓
+Flask saves file locally
+        ↓
+FFmpeg converts audio → mono WAV
+        ↓
+Whisper transcribes audio → segments + text
+        ↓
+Segment-wise speaker embeddings extracted
+        ↓
+Clustering groups segments by speaker
+        ↓
+Speaker labels assigned (Speaker 1, 2…)
+        ↓
+Final transcript generated
+        ↓
+Groq LLM analyzes sentiment
+        ↓
+JSON response returned to frontend
