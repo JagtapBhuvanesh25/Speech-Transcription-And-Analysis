@@ -78,8 +78,15 @@
             <h2 class="text-center mb-4">🎤 Audio Analyzer</h2>
 
             <form id="uploadForm" action="{{ url_for('upload_file') }}" method="POST" enctype="multipart/form-data">
+                
                 <div class="mb-3">
                     <input type="file" class="form-control" name="file" id="file">
+                </div>
+
+                <!-- NEW: Meeting Topic Input -->
+                <div class="mb-3">
+                    <input type="text" class="form-control" name="topic" id="topic"
+                           placeholder="Enter meeting topic (e.g., Sales Call, Project Review)" required>
                 </div>
 
                 <progress id="uploadProgress" value="0" max="100"></progress>
@@ -142,7 +149,7 @@ $(document).ready(function(){
                         </div>
 
                         <div class="card p-3">
-                            <div class="section-title">🧠 Sentiment Analysis</div>
+                            <div class="section-title">🧠 Analysis</div>
                             <div class="result-box sentiment-box">
                                 <pre>${data.sentiment_analysis}</pre>
                             </div>
