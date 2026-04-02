@@ -67,4 +67,4 @@ class SpeakerDiarizer:
                 transcript += f"\n{segment['speaker']} {time(segment['start'])}\n"
             transcript += segment["text"].strip() + " "
 
-        return transcript
+        return transcript, segments
