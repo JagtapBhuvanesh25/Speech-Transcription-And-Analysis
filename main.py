@@ -2,6 +2,8 @@ from flask import Flask, render_template, request, jsonify
 from werkzeug.utils import secure_filename
 import os
 import json
+import logging
+logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 
 from diarisation import SpeakerDiarizer
 from groq import Groq
@@ -11,18 +13,19 @@ from metrics import compute_all_metrics, compute_final_scores, generate_explanat
 # INIT
 # ---------------------------
 
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
+if not GROQ_API_KEY:
+    logging.warning("GROQ_API_KEY not found in environment variables.")
 client = Groq(api_key=GROQ_API_KEY)
 
 app = Flask(__name__)
-os.environ["PATH"] += os.pathsep + "C:\\ffmpeg\\bin"
+os.environ["PATH"] += os.pathsep + "C:\\ffmpeg\\bin" + os.pathsep + os.path.expandvars(r"%LOCALAPPDATA%\Microsoft\WinGet\Links")
 
 UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 ALLOWED_EXTENSIONS = {'wav', 'mp3', 'm4a'}
-NUMBER_SPEAKERS = 2
-diarizer = SpeakerDiarizer(num_speakers=NUMBER_SPEAKERS)
+diarizer = SpeakerDiarizer()
 
 
 # ---------------------------
@@ -33,9 +36,9 @@ def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
-def transcribe_audio(audio_path):
+def transcribe_audio(audio_path, num_spk=None):
     # 🔥 IMPORTANT: now returns transcript + segments
-    transcript, segments = diarizer.diarize(audio_path)
+    transcript, segments = diarizer.diarize(audio_path, num_speakers=num_spk)
     print(transcript)
     return transcript, segments
 
@@ -44,6 +47,9 @@ def transcribe_audio(audio_path):
 # LLM ANALYSIS (JSON OUTPUT)
 # ---------------------------
 def analyze_with_llm(text, topic, metrics):
+    speaker_keys = list(metrics.keys())
+    speaker_json_structure = ",\n".join([f'    "{sp}": {{\n      "contribution_quality": 0,\n      "interaction_score": 0,\n      "decision_impact": 0\n    }}' for sp in speaker_keys])
+
     response = client.chat.completions.create(
         model="llama-3.3-70b-versatile",
         messages=[
@@ -80,16 +86,7 @@ JSON format:
   "decision_impact": "",
 
   "speaker_scores": {{
-    "SPEAKER 1": {{
-      "contribution_quality": 0,
-      "interaction_score": 0,
-      "decision_impact": 0
-    }},
-    "SPEAKER 2": {{
-      "contribution_quality": 0,
-      "interaction_score": 0,
-      "decision_impact": 0
-    }}
+{speaker_json_structure}
   }}
 }}
 """
@@ -139,6 +136,8 @@ def upload_file():
         return jsonify({'error': 'No selected file'})
 
     topic = request.form.get("topic", "General conversation")
+    num_spk = request.form.get("num_speakers", "").strip()
+    num_spk = int(num_spk) if num_spk.isdigit() else None
 
     if file and allowed_file(file.filename):
         filename = secure_filename(file.filename)
@@ -148,11 +147,13 @@ def upload_file():
 
         print(f"Saved file at: {filepath}")
         print(f"Meeting Topic: {topic}")
+        if num_spk:
+            print(f"Expected Speakers: {num_spk}")
 
         # ---------------------------
         # STEP 1: DIARIZATION
         # ---------------------------
-        transcript, segments = transcribe_audio(filepath)
+        transcript, segments = transcribe_audio(filepath, num_spk)
 
         # ---------------------------
         # STEP 2: METRICS (deterministic)
@@ -171,10 +172,11 @@ def upload_file():
         # ---------------------------
         return jsonify({
             "transcript": transcript,
+            "segments": segments,
             "metrics": metrics,
             "analysis": analysis,
             "final_scores": final_scores,
-        "explanations": explanations
+            "explanations": explanations
         })
 
     return jsonify({'error': 'Invalid file format'})
