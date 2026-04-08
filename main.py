@@ -39,6 +39,10 @@ UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 ALLOWED_EXTENSIONS = {"wav", "mp3", "m4a"}
+
+# Single shared diarizer instance — models load once at startup.
+# num_speakers is now passed per-request via diarize(), so this singleton
+# can correctly handle different speaker counts across concurrent calls.
 diarizer = SpeakerDiarizer()
 
 
@@ -87,6 +91,25 @@ def error_response(message: str, status: int = 400):
     return jsonify({"error": message}), status
 
 
+def _parse_num_speakers(raw: str | None) -> int | None:
+    """
+    Convert the form value for num_speakers into an int or None.
+
+    Returns None (→ auto-detect) when:
+      - the field was left blank / missing
+      - the value is not a positive integer
+      - the value is below 2 (nonsensical for diarization)
+    """
+    if not raw or not raw.strip():
+        return None
+    try:
+        n = int(raw.strip())
+        return n if n >= 2 else None
+    except ValueError:
+        logger.warning(f"Non-integer num_speakers value '{raw}' — using auto-detect.")
+        return None
+
+
 # ---------------------------
 # LLM JSON PARSING
 # Three-stage repair: direct → single-quote fix → brace extraction
@@ -100,7 +123,6 @@ def _parse_and_validate_llm_json(raw: str, expected_speakers: list) -> dict:
     # Strip markdown code fences if the model wrapped output in ```json ... ```
     if "```" in raw:
         parts = raw.split("```")
-        # Take the content inside the first fence pair
         raw = parts[1].lstrip("json").strip() if len(parts) > 1 else raw
 
     parsed = None
@@ -236,6 +258,14 @@ def upload_file():
 
     topic = (request.form.get("topic") or "General conversation").strip()
 
+    # Parse optional num_speakers from the form.
+    # Returns None → auto-detect via silhouette score inside diarize().
+    num_speakers = _parse_num_speakers(request.form.get("num_speakers"))
+    logger.info(
+        f"num_speakers from form: "
+        f"{'auto-detect' if num_speakers is None else num_speakers}"
+    )
+
     # UUID prefix prevents filename collisions across concurrent requests
     filename = f"{uuid.uuid4().hex}_{secure_filename(file.filename)}"
     filepath = os.path.join(UPLOAD_FOLDER, filename)
@@ -245,7 +275,10 @@ def upload_file():
     try:
         # ---- Step 1: Diarization ----
         try:
-            transcript, segments = diarizer.diarize(filepath)
+            # num_speakers=None → auto-detect inside diarize()
+            transcript, segments = diarizer.diarize(
+                filepath, num_speakers=num_speakers
+            )
         except DiarizationError as exc:
             return error_response(f"Diarization failed: {exc}", 422)
         except Exception as exc:
@@ -259,9 +292,15 @@ def upload_file():
                 422,
             )
 
-        logger.info(f"Diarization complete. Transcript length: {len(transcript)} chars.")
+        # Log how many unique speakers were detected
+        unique_speakers = {seg["speaker"] for seg in segments}
+        logger.info(
+            f"Diarization complete. "
+            f"Speakers detected: {sorted(unique_speakers)}. "
+            f"Transcript length: {len(transcript)} chars."
+        )
 
-        # ---- Step 2: Metrics (deterministic, no API calls except topic_metrics) ----
+        # ---- Step 2: Metrics ----
         try:
             metrics = compute_all_metrics(segments, topic)
         except Exception as exc:
