@@ -58,7 +58,7 @@ class SpeakerDiarizer:
 
     def __init__(self):
         logger.info("Loading Whisper 'small' model...")
-        self.model = whisper.load_model("tiny")
+        self.model = whisper.load_model("small")
         logger.info("Loading SpeechBrain speaker-embedding model...")
         self.embedding_model = PretrainedSpeakerEmbedding(
             "speechbrain/spkrec-ecapa-voxceleb"
