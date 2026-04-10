@@ -173,7 +173,7 @@ def _process_job(job_id: str, filepath: str, topic: str, num_speakers):
 @app.route("/", methods=["GET"])
 def index():
     """Serve the frontend HTML."""
-    return send_from_directory(".", "meeting_intelligence.html")
+    return send_from_directory(".", "traffic_stop.html")
 
 
 @app.route("/health", methods=["GET"])

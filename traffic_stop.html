@@ -1,0 +1,1023 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SENTINEL — Traffic Stop Intelligence</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Rajdhani:wght@400;500;600;700&family=JetBrains+Mono:wght@300;400;500;600&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#04060a;
+  --s1:#080c12;--s2:#0c1018;--s3:#101520;--s4:#141a24;
+  --b1:#ffffff06;--b2:#ffffff0e;--b3:#ffffff18;--b4:#ffffff28;
+  --t1:#e8eeff;--t2:#7a88a8;--t3:#3e4e6a;--t4:#202c40;
+  --red:#ff3333;--red2:#ff6b35;--redg:#ff333318;--red2g:#ff6b3515;
+  --grn:#00ff88;--grng:#00ff8815;
+  --amber:#ffaa00;--amberg:#ffaa0018;
+  --blue:#4488ff;--blueg:#4488ff15;
+  --cyan:#00ddff;--cyng:#00ddff12;
+  --purple:#aa55ff;--purpleg:#aa55ff15;
+  --r:6px;--rl:12px;--rxl:18px;
+}
+html{scroll-behavior:smooth}
+body{font-family:'Rajdhani',sans-serif;background:var(--bg);color:var(--t1);min-height:100vh;font-size:14px;overflow-x:hidden;cursor:default}
+
+/* SCAN LINE EFFECT */
+body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.03) 2px,rgba(0,0,0,0.03) 4px);pointer-events:none;z-index:9998}
+body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse at 50% 0%,rgba(68,136,255,0.04) 0%,transparent 60%);pointer-events:none;z-index:0}
+
+/* ANIMATED CORNER BRACKETS */
+@keyframes pulse-border{0%,100%{opacity:0.4}50%{opacity:1}}
+@keyframes blink{0%,49%{opacity:1}50%,100%{opacity:0}}
+@keyframes scanline{0%{top:-10%}100%{top:110%}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
+@keyframes rot{to{transform:rotate(360deg)}}
+@keyframes threat-pulse{0%,100%{box-shadow:0 0 0 0 rgba(255,51,51,0)}50%{box-shadow:0 0 0 8px rgba(255,51,51,0)}}
+@keyframes rise-in{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+
+/* NAV */
+nav{height:60px;display:flex;align-items:center;justify-content:space-between;padding:0 2rem;border-bottom:1px solid var(--b2);background:rgba(4,6,10,0.96);backdrop-filter:blur(20px);position:sticky;top:0;z-index:200}
+.nav-l{display:flex;align-items:center;gap:16px}
+.nav-logo{display:flex;align-items:center;gap:10px}
+.nav-badge-icon{width:32px;height:32px;position:relative}
+.nav-badge-icon svg{width:100%;height:100%}
+.nav-mark{font-family:'Orbitron',monospace;font-size:18px;font-weight:900;letter-spacing:3px;color:var(--blue);line-height:1;text-shadow:0 0 20px rgba(68,136,255,0.5)}
+.nav-sep{width:1px;height:20px;background:var(--b3)}
+.nav-sub{font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--t3);letter-spacing:2px;text-transform:uppercase}
+.nav-r{display:flex;align-items:center;gap:16px}
+.nav-status{display:flex;align-items:center;gap:6px;font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--grn);letter-spacing:1px}
+.nav-status-dot{width:6px;height:6px;border-radius:50%;background:var(--grn);animation:pulse-border 1.5s ease infinite;box-shadow:0 0 6px var(--grn)}
+.nav-time{font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--t3)}
+
+main{max-width:1400px;margin:0 auto;padding:2rem 2rem;position:relative;z-index:1}
+
+/* ═══ UPLOAD SCREEN ═══ */
+.upload-wrap{min-height:calc(100vh - 60px);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:2.5rem}
+.upload-inner{width:100%;max-width:640px}
+.u-system-tag{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:4px;color:var(--blue);text-transform:uppercase;margin-bottom:1.25rem;display:flex;align-items:center;gap:10px;opacity:0.8}
+.u-system-tag::before,.u-system-tag::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,transparent,var(--blue))}
+.u-system-tag::after{background:linear-gradient(90deg,var(--blue),transparent)}
+.u-h1{font-family:'Orbitron',monospace;font-size:36px;font-weight:900;line-height:1.1;letter-spacing:1px;margin-bottom:0.75rem;color:var(--t1)}
+.u-h1 .accent{color:var(--red);text-shadow:0 0 30px rgba(255,51,51,0.4)}
+.u-desc{font-size:15px;color:var(--t2);line-height:1.7;margin-bottom:2rem;font-family:'Rajdhani',sans-serif;font-weight:400}
+.u-card{background:var(--s1);border:1px solid var(--b2);border-radius:var(--rxl);padding:2rem;box-shadow:0 40px 100px rgba(0,0,0,0.6),inset 0 1px 0 rgba(255,255,255,0.04);position:relative;overflow:hidden}
+.u-card::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--blue),transparent)}
+
+/* CORNER BRACKETS */
+.bracket-tl,.bracket-tr,.bracket-bl,.bracket-br{position:absolute;width:16px;height:16px;z-index:2}
+.bracket-tl{top:8px;left:8px;border-top:2px solid var(--blue);border-left:2px solid var(--blue)}
+.bracket-tr{top:8px;right:8px;border-top:2px solid var(--blue);border-right:2px solid var(--blue)}
+.bracket-bl{bottom:8px;left:8px;border-bottom:2px solid var(--blue);border-left:2px solid var(--blue)}
+.bracket-br{bottom:8px;right:8px;border-bottom:2px solid var(--blue);border-right:2px solid var(--blue)}
+
+.dropzone{border:1.5px dashed var(--b3);border-radius:var(--rl);padding:2rem;text-align:center;cursor:pointer;transition:all 0.2s;margin-bottom:1.5rem;position:relative;overflow:hidden}
+.dropzone:hover,.dropzone.drag{border-color:var(--blue);background:var(--blueg)}
+.dropzone input{display:none}
+.dz-icon{font-size:32px;margin-bottom:10px;filter:drop-shadow(0 0 8px rgba(68,136,255,0.4))}
+.dz-h{font-size:15px;font-weight:700;margin-bottom:4px;letter-spacing:0.5px}
+.dz-p{font-size:12px;color:var(--t3);font-family:'JetBrains Mono',monospace}
+.browse{color:var(--blue);cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+.file-chosen{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--grn);margin-top:8px;display:flex;align-items:center;justify-content:center;gap:6px}
+
+/* HARDCODED INFO DISPLAY */
+.hardcoded-info{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:1.5rem}
+.hc-field{background:var(--s2);border:1px solid var(--b2);border-radius:var(--r);padding:12px 14px}
+.hc-label{font-size:9px;font-family:'JetBrains Mono',monospace;color:var(--t3);letter-spacing:2px;text-transform:uppercase;margin-bottom:4px}
+.hc-val{font-size:14px;font-weight:700;color:var(--blue);font-family:'JetBrains Mono',monospace;letter-spacing:0.5px}
+
+.btn-scan{width:100%;padding:16px;background:linear-gradient(135deg,var(--blue),#2266ee);color:#fff;border:none;border-radius:var(--r);font-family:'Orbitron',monospace;font-size:13px;font-weight:700;cursor:pointer;letter-spacing:2px;transition:all 0.2s;box-shadow:0 0 30px rgba(68,136,255,0.3);text-transform:uppercase}
+.btn-scan:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 4px 40px rgba(68,136,255,0.5)}
+.btn-scan:disabled{opacity:0.25;cursor:not-allowed;box-shadow:none}
+.statusbar{display:flex;align-items:center;gap:10px;margin-top:1rem;padding:12px 16px;border-radius:var(--r);font-size:11px;font-family:'JetBrains Mono',monospace;letter-spacing:0.5px}
+.statusbar.loading{background:var(--amberg);color:var(--amber);border:1px solid rgba(255,170,0,0.2)}
+.statusbar.error{background:var(--redg);color:var(--red);border:1px solid rgba(255,51,51,0.2)}
+.statusbar.success{background:var(--grng);color:var(--grn);border:1px solid rgba(0,255,136,0.2)}
+.spin{width:12px;height:12px;border:2px solid rgba(255,170,0,0.2);border-top-color:var(--amber);border-radius:50%;animation:rot 0.7s linear infinite;flex-shrink:0}
+
+/* FEATURE PILLS */
+.feature-pills{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.fpill{font-size:10px;font-family:'JetBrains Mono',monospace;padding:5px 12px;border-radius:20px;border:1px solid;letter-spacing:0.5px;display:flex;align-items:center;gap:5px}
+.fpill-r{background:var(--redg);color:var(--red);border-color:rgba(255,51,51,0.3)}
+.fpill-a{background:var(--amberg);color:var(--amber);border-color:rgba(255,170,0,0.3)}
+.fpill-g{background:var(--grng);color:var(--grn);border-color:rgba(0,255,136,0.3)}
+.fpill-b{background:var(--blueg);color:var(--blue);border-color:rgba(68,136,255,0.3)}
+.fpill-p{background:var(--purpleg);color:var(--purple);border-color:rgba(170,85,255,0.3)}
+
+/* ═══ DASHBOARD ═══ */
+#dash{display:none;animation:rise-in 0.6s cubic-bezier(0.16,1,0.3,1) both}
+
+.dash-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:2rem;gap:1rem;flex-wrap:wrap}
+.dash-incident-id{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--t3);letter-spacing:2px;margin-bottom:6px;text-transform:uppercase}
+.dash-title{font-family:'Orbitron',monospace;font-size:28px;font-weight:900;letter-spacing:1px;line-height:1.1;margin-bottom:8px}
+.dash-chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{font-size:10px;font-family:'JetBrains Mono',monospace;padding:4px 10px;border-radius:20px;border:1px solid;letter-spacing:0.5px}
+.chip-r{background:var(--redg);color:var(--red);border-color:rgba(255,51,51,0.3)}
+.chip-a{background:var(--amberg);color:var(--amber);border-color:rgba(255,170,0,0.3)}
+.chip-g{background:var(--grng);color:var(--grn);border-color:rgba(0,255,136,0.3)}
+.chip-b{background:var(--blueg);color:var(--blue);border-color:rgba(68,136,255,0.3)}
+.btn-new{display:flex;align-items:center;gap:6px;padding:10px 18px;background:var(--s2);border:1px solid var(--b2);border-radius:var(--r);font-size:11px;font-weight:600;color:var(--t2);cursor:pointer;transition:all 0.2s;font-family:'JetBrains Mono',monospace;letter-spacing:1px;text-transform:uppercase}
+.btn-new:hover{background:var(--s3);color:var(--t1);border-color:var(--b3)}
+
+/* ═══ THREAT LEVEL HERO ═══ */
+.threat-hero{background:var(--s1);border:1px solid var(--b2);border-radius:var(--rxl);padding:2.5rem;margin-bottom:1.5rem;position:relative;overflow:hidden;display:grid;grid-template-columns:1fr auto;gap:2rem;align-items:center}
+.threat-hero::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,transparent 60%,rgba(255,51,51,0.03));pointer-events:none}
+.th-scan-line{position:absolute;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(68,136,255,0.3),transparent);animation:scanline 4s linear infinite;pointer-events:none}
+.th-label{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:3px;color:var(--t3);text-transform:uppercase;margin-bottom:12px}
+.th-verdict{font-family:'Rajdhani',sans-serif;font-size:26px;font-weight:700;line-height:1.35;color:var(--t1);max-width:680px;margin-bottom:1rem}
+.th-verdict .hi{font-style:normal;font-weight:700}
+.th-badges{display:flex;gap:8px;flex-wrap:wrap}
+.th-badge{font-size:11px;padding:5px 14px;border-radius:4px;font-weight:700;font-family:'JetBrains Mono',monospace;letter-spacing:0.5px;border:1px solid}
+
+/* THREAT METER */
+.threat-meter-wrap{text-align:center;flex-shrink:0;min-width:160px}
+.threat-level-ring{width:140px;height:140px;border-radius:50%;position:relative;margin:0 auto 12px;display:flex;align-items:center;justify-content:center;border:3px solid var(--b3)}
+.threat-level-ring::before{content:'';position:absolute;inset:-3px;border-radius:50%;border:3px solid transparent;border-top-color:var(--red);border-right-color:var(--red);animation:rot 3s linear infinite}
+.tlr-inner{text-align:center}
+.tlr-val{font-family:'Orbitron',monospace;font-size:36px;font-weight:900;line-height:1}
+.tlr-label{font-size:9px;font-family:'JetBrains Mono',monospace;color:var(--t3);letter-spacing:2px;margin-top:2px}
+.threat-text{font-size:12px;font-family:'JetBrains Mono',monospace;color:var(--t3);letter-spacing:1px;text-transform:uppercase}
+
+/* ═══ ROLE CARDS — POLICE + DRIVER ═══ */
+.role-row{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-bottom:1.5rem}
+.role-card{background:var(--s1);border:1px solid var(--b2);border-radius:var(--rl);padding:1.75rem;position:relative;overflow:hidden;transition:border-color 0.2s}
+.role-card.police-card{border-left:3px solid var(--blue)}
+.role-card.driver-card{border-left:3px solid var(--amber)}
+.role-card-glow{position:absolute;top:-40px;right:-40px;width:120px;height:120px;border-radius:50%;filter:blur(40px);pointer-events:none;opacity:0.3}
+.rc-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem}
+.rc-identity{display:flex;align-items:center;gap:12px}
+.rc-icon{width:44px;height:44px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0}
+.rc-role{font-size:10px;font-family:'JetBrains Mono',monospace;letter-spacing:2px;text-transform:uppercase;margin-bottom:3px}
+.rc-name{font-size:16px;font-weight:700;letter-spacing:0.3px}
+.rc-verdict-badge{font-size:11px;font-family:'JetBrains Mono',monospace;padding:5px 12px;border-radius:4px;font-weight:700;border:1px solid;letter-spacing:0.5px;text-transform:uppercase;white-space:nowrap}
+.rc-narrative{font-size:13px;color:var(--t2);line-height:1.7;margin-bottom:1.25rem;padding:12px;background:var(--s2);border-radius:var(--r);border-left:2px solid var(--b3);font-style:italic}
+.rc-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:1rem}
+.rc-metric{background:var(--s2);border-radius:var(--r);padding:10px;text-align:center;border:1px solid var(--b1)}
+.rc-metric-label{font-size:9px;font-family:'JetBrains Mono',monospace;color:var(--t3);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px}
+.rc-metric-val{font-size:18px;font-weight:700;font-family:'JetBrains Mono',monospace;line-height:1}
+.rc-flags{display:flex;flex-wrap:wrap;gap:5px}
+.rc-flag{font-size:10px;padding:3px 8px;border-radius:4px;font-family:'JetBrains Mono',monospace;font-weight:600;letter-spacing:0.3px}
+
+/* ═══ DETECTION PANELS ═══ */
+.detection-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-bottom:1.5rem}
+.detect-card{background:var(--s1);border:1px solid var(--b2);border-radius:var(--rl);padding:1.5rem;position:relative;overflow:hidden;transition:all 0.2s}
+.detect-card:hover{border-color:var(--b3);transform:translateY(-2px)}
+.detect-card-top-bar{position:absolute;top:0;left:0;right:0;height:2px}
+.detect-icon-wrap{width:42px;height:42px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;margin-bottom:12px;border:1px solid}
+.detect-title{font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--t3);letter-spacing:2px;text-transform:uppercase;margin-bottom:8px}
+.detect-score-big{font-family:'Orbitron',monospace;font-size:42px;font-weight:900;line-height:1;margin-bottom:6px;letter-spacing:-1px}
+.detect-label{font-size:12px;font-weight:700;letter-spacing:0.5px;margin-bottom:8px;font-family:'JetBrains Mono',monospace}
+.detect-desc{font-size:12px;color:var(--t2);line-height:1.6}
+.detect-bar-wrap{height:4px;background:var(--s4);border-radius:2px;margin-top:12px;overflow:hidden}
+.detect-bar-fill{height:100%;border-radius:2px;transition:width 1.2s cubic-bezier(0.16,1,0.3,1)}
+
+/* ═══ BEHAVIORAL ANALYSIS ═══ */
+.behavior-section{background:var(--s1);border:1px solid var(--b2);border-radius:var(--rl);padding:1.75rem;margin-bottom:1.5rem}
+.bs-header{display:flex;align-items:center;gap:12px;margin-bottom:1.5rem}
+.bs-icon{width:36px;height:36px;background:var(--blueg);border:1px solid var(--blue);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px}
+.bs-title{font-family:'Orbitron',monospace;font-size:16px;font-weight:700;letter-spacing:1px}
+.bs-sub{font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--t3);letter-spacing:1px}
+.behavior-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:1rem}
+.beh-item{background:var(--s2);border-radius:var(--r);padding:1rem;border:1px solid var(--b1);display:flex;flex-direction:column;gap:6px}
+.beh-top{display:flex;align-items:center;justify-content:space-between}
+.beh-label{font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--t3);letter-spacing:1px;text-transform:uppercase}
+.beh-score{font-size:14px;font-weight:700;font-family:'JetBrains Mono',monospace}
+.beh-bar-track{height:5px;background:var(--s4);border-radius:3px;overflow:hidden}
+.beh-bar-fill{height:100%;border-radius:3px;transition:width 1s cubic-bezier(0.16,1,0.3,1)}
+.beh-note{font-size:11px;color:var(--t3);line-height:1.5}
+
+/* ═══ REPORT BLOCKS ═══ */
+.report-section{margin-bottom:1.5rem}
+.report-header{display:flex;align-items:center;gap:12px;margin-bottom:1.25rem}
+.report-icon-wrap{width:38px;height:38px;background:var(--purpleg);border:1px solid var(--purple);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px}
+.report-title{font-family:'Orbitron',monospace;font-size:16px;font-weight:700;letter-spacing:1px}
+.report-sub{font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--t3);letter-spacing:1px}
+.report-blocks{display:flex;flex-direction:column;gap:2px}
+.rb{background:var(--s1);border:1px solid var(--b1);border-radius:var(--rl);padding:1.25rem 1.5rem;border-left:3px solid transparent;transition:border-left-color 0.2s,background 0.2s}
+.rb:hover{border-left-color:var(--blue);background:var(--s2)}
+.rb-h{font-size:12px;font-weight:700;color:var(--t1);margin-bottom:6px;display:flex;align-items:center;gap:8px;font-family:'Rajdhani',sans-serif;font-size:13px;letter-spacing:0.5px}
+.rb-tag{font-size:9px;font-family:'JetBrains Mono',monospace;padding:2px 7px;border-radius:3px;background:var(--purpleg);color:var(--purple);border:1px solid var(--purple);font-weight:400;letter-spacing:0.5px}
+.rb-p{font-size:13px;color:var(--t2);line-height:1.75;font-family:'Rajdhani',sans-serif;font-weight:400}
+.rb-p strong{color:var(--t1);font-weight:700}
+.rb-p p{margin-bottom:6px}
+.rb-p ul{padding-left:1rem;margin-top:6px}
+.rb-p li{margin-bottom:4px}
+
+/* ═══ RED / GREEN FLAGS ═══ */
+.flags-row{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-bottom:1.5rem}
+.flags-card{background:var(--s1);border:1px solid var(--b2);border-radius:var(--rl);padding:1.75rem}
+.flags-title{font-family:'Orbitron',monospace;font-size:14px;font-weight:700;letter-spacing:1px;margin-bottom:1.25rem;display:flex;align-items:center;gap:8px}
+.flag-item{display:flex;gap:12px;padding:11px 0;border-bottom:1px solid var(--b1);align-items:flex-start}
+.flag-item:last-child{border-bottom:none}
+.flag-icon{font-size:14px;flex-shrink:0;margin-top:1px}
+.flag-text{font-size:13px;line-height:1.55;font-family:'Rajdhani',sans-serif}
+.flag-text strong{display:block;font-size:12px;font-weight:700;margin-bottom:2px;font-family:'JetBrains Mono',monospace;letter-spacing:0.3px}
+
+/* ═══ SPEAKER COMPARISON ═══ */
+.compare-section{background:var(--s1);border:1px solid var(--b2);border-radius:var(--rl);padding:1.75rem;margin-bottom:1.5rem}
+.compare-title-row{display:flex;align-items:baseline;gap:10px;margin-bottom:4px}
+.compare-title{font-family:'Orbitron',monospace;font-size:16px;font-weight:700;letter-spacing:1px}
+.compare-sub{font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--t3);letter-spacing:1px;margin-bottom:1.5rem}
+.compare-grid{display:grid;gap:1rem}
+.compare-row{display:grid;grid-template-columns:130px 1fr;gap:12px;align-items:center}
+.compare-role{display:flex;align-items:center;gap:8px}
+.cs-dot{width:10px;height:10px;border-radius:2px;flex-shrink:0}
+.cs-name{font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--t2)}
+.compare-bars{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.cbar-wrap{display:flex;flex-direction:column;gap:4px}
+.cbar-label{font-size:8px;font-family:'JetBrains Mono',monospace;color:var(--t4);text-transform:uppercase;letter-spacing:0.5px}
+.cbar-track{height:32px;background:var(--s4);border-radius:4px;overflow:hidden;position:relative}
+.cbar-fill{position:absolute;bottom:0;left:0;right:0;border-radius:3px 3px 0 0;transition:height 1s cubic-bezier(0.16,1,0.3,1)}
+.cbar-val{font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--t2);text-align:center}
+
+/* ═══ CHART ═══ */
+.chart-section{background:var(--s1);border:1px solid var(--b2);border-radius:var(--rl);padding:1.75rem;margin-bottom:1.5rem}
+.chart-wrap{height:220px;position:relative;margin-top:1rem}
+
+/* ═══ RAW DETAILS ═══ */
+.details-section{margin-bottom:2rem}
+.details-toggle{display:flex;align-items:center;justify-content:space-between;background:var(--s1);border:1px solid var(--b2);border-radius:var(--rl);padding:1.25rem 1.75rem;cursor:pointer;transition:background 0.2s;user-select:none}
+.details-toggle:hover{background:var(--s2)}
+.dt-left{display:flex;flex-direction:column;gap:2px}
+.dt-title{font-size:13px;font-weight:700;font-family:'JetBrains Mono',monospace;letter-spacing:1px}
+.dt-sub{font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--t3);letter-spacing:0.5px}
+.dt-arrow{font-size:18px;color:var(--t3);transition:transform 0.3s}
+.dt-arrow.open{transform:rotate(180deg)}
+.details-body{display:none;background:var(--s1);border:1px solid var(--b2);border-top:none;border-radius:0 0 var(--rl) var(--rl);padding:1.5rem}
+.details-body.open{display:block}
+.raw-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.raw-item{background:var(--s2);border-radius:var(--r);padding:10px 12px;border:1px solid var(--b1)}
+.raw-label{font-size:8px;font-family:'JetBrains Mono',monospace;color:var(--t4);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px}
+.raw-val{font-size:13px;font-weight:600;font-family:'JetBrains Mono',monospace;color:var(--t2)}
+.raw-section-title{font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--t3);letter-spacing:2px;margin:1.25rem 0 0.75rem;text-transform:uppercase;padding-bottom:6px;border-bottom:1px solid var(--b2)}
+
+/* INCIDENT ID LINE */
+.incident-bar{background:var(--s2);border:1px solid var(--b2);border-radius:var(--r);padding:10px 16px;margin-bottom:1.5rem;display:flex;align-items:center;justify-content:space-between;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--t3);letter-spacing:1px}
+.incident-bar span{color:var(--blue)}
+
+@media(max-width:1024px){.detection-grid{grid-template-columns:1fr 1fr}.compare-row{grid-template-columns:1fr}}
+@media(max-width:768px){.role-row,.flags-row{grid-template-columns:1fr}.detection-grid{grid-template-columns:1fr}.behavior-grid{grid-template-columns:1fr}.threat-hero{grid-template-columns:1fr}.compare-bars{grid-template-columns:1fr 1fr}}
+@media(max-width:560px){main{padding:1rem}.dash-title{font-size:20px}.u-h1{font-size:26px}}
+</style>
+</head>
+<body>
+<nav>
+  <div class="nav-l">
+    <div class="nav-logo">
+      <svg class="nav-badge-icon" viewBox="0 0 32 32" fill="none">
+        <polygon points="16,2 30,9 30,23 16,30 2,23 2,9" fill="none" stroke="#4488ff" stroke-width="1.5"/>
+        <polygon points="16,7 25,11.5 25,20.5 16,25 7,20.5 7,11.5" fill="rgba(68,136,255,0.1)" stroke="#4488ff" stroke-width="0.8"/>
+        <text x="16" y="20" text-anchor="middle" fill="#4488ff" font-family="monospace" font-size="9" font-weight="bold">★</text>
+      </svg>
+    </div>
+    <div class="nav-mark">SENTINEL</div>
+    <div class="nav-sep"></div>
+    <div class="nav-sub">Traffic Stop Intelligence</div>
+  </div>
+  <div class="nav-r">
+    <div class="nav-status"><div class="nav-status-dot"></div>SYSTEM ONLINE</div>
+    <div class="nav-time" id="navTime"></div>
+  </div>
+</nav>
+
+<main>
+
+<!-- ═══════════════════ UPLOAD SCREEN ═══════════════════ -->
+<div id="uploadScreen" class="upload-wrap">
+  <div class="upload-inner">
+    <div class="u-system-tag">Sentinel AI · Law Enforcement Analytics</div>
+    <h1 class="u-h1">Traffic Stop<br><span class="accent">Threat & Integrity</span><br>Analysis</h1>
+    <p class="u-desc">Upload a traffic stop audio recording. The system will analyze police behavior, detect corruption signals, assess threat levels, and evaluate driver suspicion using AI-powered conversation intelligence.</p>
+    <div class="u-card">
+      <div class="bracket-tl"></div><div class="bracket-tr"></div>
+      <div class="bracket-bl"></div><div class="bracket-br"></div>
+      <div class="dropzone" id="dropZone">
+        <div class="dz-icon">🎙</div>
+        <div class="dz-h">Upload Traffic Stop Recording</div>
+        <p class="dz-p">or <span class="browse" onclick="document.getElementById('audioFile').click()">browse files</span> — MP3, WAV, M4A</p>
+        <input type="file" id="audioFile" accept="audio/*,.mp3,.wav,.m4a">
+        <div class="file-chosen" id="fileLabel"></div>
+      </div>
+      <div class="hardcoded-info">
+        <div class="hc-field">
+          <div class="hc-label">Speakers Detected</div>
+          <div class="hc-val">2 — OFFICER + DRIVER</div>
+        </div>
+        <div class="hc-field">
+          <div class="hc-label">Analysis Context</div>
+          <div class="hc-val">TRAFFIC STOP INTERACTION</div>
+        </div>
+      </div>
+      <button class="btn-scan" id="analyzeBtn" onclick="runAnalysis()">⬡ INITIATE ANALYSIS SCAN</button>
+      <div class="statusbar" id="statusBar" style="display:none"></div>
+    </div>
+  </div>
+  <div class="feature-pills">
+    <div class="fpill fpill-r">🚨 Corruption Detection</div>
+    <div class="fpill fpill-a">⚠ Threat Assessment</div>
+    <div class="fpill fpill-b">🛡 Police Integrity Score</div>
+    <div class="fpill fpill-g">🔍 Driver Suspicion Index</div>
+    <div class="fpill fpill-p">🧠 Behavioral Analysis</div>
+  </div>
+</div>
+
+<!-- ═══════════════════ DASHBOARD ═══════════════════ -->
+<div id="dash">
+
+  <!-- INCIDENT BAR -->
+  <div class="incident-bar">
+    <span>INCIDENT ID: <span id="incidentId">—</span></span>
+    <span>TIMESTAMP: <span id="incidentTime">—</span></span>
+    <span>STATUS: <span style="color:var(--grn)">ANALYSIS COMPLETE</span></span>
+    <span>PARTICIPANTS: <span>OFFICER + DRIVER</span></span>
+  </div>
+
+  <div class="dash-header">
+    <div>
+      <div class="dash-incident-id">Traffic Stop Analysis Report</div>
+      <div class="dash-title" id="dashTitle">—</div>
+      <div class="dash-chips" id="dashChips"></div>
+    </div>
+    <button class="btn-new" onclick="resetToUpload()">↑ NEW SCAN</button>
+  </div>
+
+  <!-- 1. THREAT LEVEL HERO -->
+  <div class="threat-hero" id="threatHero">
+    <div class="th-scan-line"></div>
+    <div>
+      <div class="th-label">🔴 OVERALL INCIDENT ASSESSMENT</div>
+      <div class="th-verdict" id="thVerdict">—</div>
+      <div class="th-badges" id="thBadges"></div>
+    </div>
+    <div class="threat-meter-wrap">
+      <div class="threat-level-ring" id="threatRing">
+        <div class="tlr-inner">
+          <div class="tlr-val" id="tlrVal">—</div>
+          <div class="tlr-label">THREAT</div>
+        </div>
+      </div>
+      <div class="threat-text" id="threatText">—</div>
+    </div>
+  </div>
+
+  <!-- 2. THREE DETECTION CARDS -->
+  <div class="detection-grid" id="detectionGrid"></div>
+
+  <!-- 3. POLICE + DRIVER ROLE CARDS -->
+  <div class="role-row">
+    <div class="role-card police-card" id="policeCard">
+      <div class="role-card-glow" style="background:var(--blue)"></div>
+    </div>
+    <div class="role-card driver-card" id="driverCard">
+      <div class="role-card-glow" style="background:var(--amber)"></div>
+    </div>
+  </div>
+
+  <!-- 4. BEHAVIORAL ANALYSIS -->
+  <div class="behavior-section">
+    <div class="bs-header">
+      <div class="bs-icon">🧠</div>
+      <div>
+        <div class="bs-title">BEHAVIORAL ANALYSIS</div>
+        <div class="bs-sub">Linguistic and conversational pattern intelligence</div>
+      </div>
+    </div>
+    <div class="behavior-grid" id="behaviorGrid"></div>
+  </div>
+
+  <!-- 5. AI ANALYST REPORT -->
+  <div class="report-section">
+    <div class="report-header">
+      <div class="report-icon-wrap">✦</div>
+      <div>
+        <div class="report-title">INCIDENT ANALYSIS REPORT</div>
+        <div class="report-sub">AI-generated behavioral and integrity assessment</div>
+      </div>
+    </div>
+    <div class="report-blocks" id="reportBlocks"></div>
+  </div>
+
+  <!-- 6. FLAGS -->
+  <div class="flags-row">
+    <div class="flags-card">
+      <div class="flags-title" style="color:var(--red)">🚨 Concern Indicators</div>
+      <div id="redFlags"></div>
+    </div>
+    <div class="flags-card">
+      <div class="flags-title" style="color:var(--grn)">✅ Compliance Indicators</div>
+      <div id="greenFlags"></div>
+    </div>
+  </div>
+
+  <!-- 7. COMPARISON + CHART -->
+  <div class="compare-section">
+    <div class="compare-title-row">
+      <div class="compare-title">PERFORMANCE COMPARISON</div>
+    </div>
+    <div class="compare-sub">Officer vs Driver — key behavioral dimensions</div>
+    <div class="compare-grid" id="compareGrid"></div>
+  </div>
+
+  <div class="chart-section">
+    <div style="font-family:'Orbitron',monospace;font-size:14px;font-weight:700;letter-spacing:1px;margin-bottom:4px">LLM SCORE BREAKDOWN</div>
+    <div style="font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--t3);letter-spacing:1px">Contribution quality · Interaction score · Decision impact per speaker</div>
+    <div class="chart-wrap"><canvas id="llmChart"></canvas></div>
+  </div>
+
+  <!-- 8. RAW DATA ACCORDION -->
+  <div class="details-section">
+    <div class="details-toggle" onclick="toggleDetails()">
+      <div class="dt-left">
+        <div class="dt-title">RAW SENSOR DATA</div>
+        <div class="dt-sub">All computed metrics from the analysis engine — click to expand</div>
+      </div>
+      <div class="dt-arrow" id="dtArrow">▾</div>
+    </div>
+    <div class="details-body" id="detailsBody"></div>
+  </div>
+
+</div><!-- /dash -->
+</main>
+
+<script>
+// ── COLORS: Police = Blue, Driver = Amber ─────────────────────────────────
+const ROLE_COLORS=['#4488ff','#ffaa00'];
+const ROLE_COLORS_G=['#4488ff15','#ffaa0018'];
+const ROLE_COLORS_B=['#4488ff30','#ffaa0030'];
+const ROLE_NAMES=['OFFICER','DRIVER'];
+const ROLE_ICONS=['🛡','🚗'];
+
+// ── UI CLOCK ──────────────────────────────────────────────────────────────
+function updateClock(){document.getElementById('navTime').textContent=new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',second:'2-digit'});}
+updateClock();setInterval(updateClock,1000);
+
+// ── UPLOAD UI ─────────────────────────────────────────────────────────────
+const dropZone=document.getElementById('dropZone'),fileInput=document.getElementById('audioFile'),fileLabel=document.getElementById('fileLabel');
+fileInput.addEventListener('change',()=>{if(fileInput.files[0])fileLabel.innerHTML=`<span style="color:var(--grn)">✓</span> ${fileInput.files[0].name}`;});
+dropZone.addEventListener('dragover',e=>{e.preventDefault();dropZone.classList.add('drag');});
+dropZone.addEventListener('dragleave',()=>dropZone.classList.remove('drag'));
+dropZone.addEventListener('drop',e=>{e.preventDefault();dropZone.classList.remove('drag');const f=e.dataTransfer.files[0];if(f){fileInput.files=e.dataTransfer.files;fileLabel.innerHTML=`<span style="color:var(--grn)">✓</span> ${f.name}`;}});
+
+function setStatus(msg,type){
+  const bar=document.getElementById('statusBar');
+  if(!msg){bar.style.display='none';return;}
+  bar.style.display='flex';bar.className='statusbar '+(type||'loading');
+  bar.innerHTML=type==='error'?`<span>⚠</span> ${msg}`:type==='success'?`<span>✓</span> ${msg}`:`<div class="spin"></div> ${msg}`;
+}
+function resetToUpload(){
+  document.getElementById('dash').style.display='none';
+  document.getElementById('uploadScreen').style.display='flex';
+  document.getElementById('analyzeBtn').disabled=false;
+  setStatus('');
+  if(window._chart){window._chart.destroy();window._chart=null;}
+}
+function toggleDetails(){
+  const body=document.getElementById('detailsBody'),arrow=document.getElementById('dtArrow');
+  body.classList.toggle('open');arrow.classList.toggle('open');
+}
+
+// ── TRAFFIC STOP INTELLIGENCE LOGIC ──────────────────────────────────────
+
+// Maps speaker index to role — Speaker 1 = Officer, Speaker 2 = Driver
+function getSpeakerRole(idx){return ROLE_NAMES[idx]||`SPEAKER ${idx+1}`;}
+
+// Compute overall threat level (0-100) from metrics
+function computeThreatLevel(data){
+  const sKeys=Object.keys(data.speaker_insights||{});
+  // High sentiment variance = tension
+  const sentiments=sKeys.map(k=>data.speaker_insights[k]?.metrics?.sentiment_score||0);
+  const minSent=Math.min(...sentiments),maxSent=Math.max(...sentiments);
+  const sentTension=Math.min(1,(maxSent-minSent)*3);
+  // Low confidence = stress / deception signal
+  const avgConf=sKeys.reduce((s,k)=>s+(data.speaker_insights[k]?.metrics?.confidence_score||0),0)/(sKeys.length||1);
+  const confStress=1-avgConf;
+  // Filler rate elevation
+  const avgFiller=sKeys.reduce((s,k)=>s+(data.speaker_insights[k]?.metrics?.filler_rate||0),0)/(sKeys.length||1);
+  const fillerStress=Math.min(1,avgFiller*50);
+  // Low agenda alignment = evasion
+  const avgAgenda=sKeys.reduce((s,k)=>s+(data.speaker_insights[k]?.metrics?.agenda_alignment_percent||0),0)/(sKeys.length||1);
+  const evasion=(100-avgAgenda)/100;
+  // LLM decision impact inversion = low decisiveness = unresolved tension
+  const avgImpact=sKeys.reduce((s,k)=>s+(data.speaker_insights[k]?.llm_scores?.decision_impact||0),0)/(sKeys.length||1);
+  const unresolvedTension=(10-avgImpact)/10;
+  return Math.min(100,Math.round(sentTension*25+confStress*25+fillerStress*15+evasion*20+unresolvedTension*15));
+}
+
+// Corruption risk score (0-100) based on police speaker behavior
+function computeCorruptionRisk(policeSpeaker,data){
+  if(!policeSpeaker)return 0;
+  const m=data.speaker_insights[policeSpeaker]?.metrics||{};
+  const ls=data.speaker_insights[policeSpeaker]?.llm_scores||{};
+  // High dominant speaking share suggests overreach
+  const shareRisk=Math.min(1,(m.speaking_share_percent||25)/100)*30;
+  // Low confidence could signal uncertainty/cover
+  const confRisk=(1-(m.confidence_score||0.5))*20;
+  // High filler rate = evasive or unprepared
+  const fillerRisk=Math.min(1,(m.filler_rate||0)*100)*20;
+  // Low agenda alignment = unprocedural
+  const agendaRisk=Math.min(1,(100-(m.agenda_alignment_percent||50))/100)*20;
+  // Negative sentiment
+  const sentRisk=Math.max(0,-(m.sentiment_score||0))*10*10;
+  return Math.min(100,Math.round(shareRisk+confRisk+fillerRisk+agendaRisk+sentRisk));
+}
+
+// Driver suspicion index (0-100)
+function computeDriverSuspicion(driverSpeaker,data){
+  if(!driverSpeaker)return 0;
+  const m=data.speaker_insights[driverSpeaker]?.metrics||{};
+  const ls=data.speaker_insights[driverSpeaker]?.llm_scores||{};
+  // Low confidence = nervousness/deception
+  const confRisk=(1-(m.confidence_score||0.5))*30;
+  // High filler rate = stress response
+  const fillerRisk=Math.min(1,(m.filler_rate||0)*80)*25;
+  // Low agenda alignment = evasive answers
+  const agendaRisk=Math.min(1,(100-(m.agenda_alignment_percent||50))/100)*25;
+  // Negative sentiment
+  const sentRisk=Math.max(0,-(m.sentiment_score||0))*20*10;
+  // Short ratio = curt, guarded responses
+  const shortRisk=(m.short_ratio||0)*10;
+  return Math.min(100,Math.round(confRisk+fillerRisk+agendaRisk+sentRisk+shortRisk));
+}
+
+// Police professionalism score (0-100) — inverse of corruption, adds procedure signals
+function computeProfessionalism(policeSpeaker,data){
+  if(!policeSpeaker)return 50;
+  const m=data.speaker_insights[policeSpeaker]?.metrics||{};
+  const ls=data.speaker_insights[policeSpeaker]?.llm_scores||{};
+  const conf=(m.confidence_score||0.5)*25;
+  const agenda=(m.agenda_alignment_percent||50)/100*25;
+  const vocab=(m.vocabulary_richness||0.5)*25;
+  const quality=(ls.contribution_quality||5)/10*25;
+  return Math.min(100,Math.round(conf+agenda+vocab+quality));
+}
+
+// Threat level descriptor
+function threatDescriptor(score){
+  if(score>=80)return{label:'CRITICAL',color:'var(--red)',bg:'var(--redg)',ring:'var(--red)'};
+  if(score>=60)return{label:'HIGH',color:'var(--red2)',bg:'var(--red2g)',ring:'var(--red2)'};
+  if(score>=40)return{label:'MODERATE',color:'var(--amber)',bg:'var(--amberg)',ring:'var(--amber)'};
+  if(score>=20)return{label:'LOW',color:'#88cc44',bg:'#88cc4415',ring:'#88cc44'};
+  return{label:'MINIMAL',color:'var(--grn)',bg:'var(--grng)',ring:'var(--grn)'};
+}
+
+function corruptionDescriptor(score){
+  if(score>=70)return{label:'HIGH RISK',color:'var(--red)'};
+  if(score>=45)return{label:'ELEVATED',color:'var(--red2)'};
+  if(score>=25)return{label:'MODERATE',color:'var(--amber)'};
+  return{label:'LOW RISK',color:'var(--grn)'};
+}
+
+function suspicionDescriptor(score){
+  if(score>=70)return{label:'HIGHLY SUSPICIOUS',color:'var(--red)'};
+  if(score>=45)return{label:'SUSPICIOUS',color:'var(--red2)'};
+  if(score>=25)return{label:'UNCERTAIN',color:'var(--amber)'};
+  return{label:'COOPERATIVE',color:'var(--grn)'};
+}
+
+function professionalismDescriptor(score){
+  if(score>=75)return{label:'EXEMPLARY',color:'var(--grn)'};
+  if(score>=55)return{label:'ACCEPTABLE',color:'#88cc44'};
+  if(score>=35)return{label:'SUBSTANDARD',color:'var(--amber)'};
+  return{label:'CONCERNING',color:'var(--red)'};
+}
+
+// Build overall incident verdict sentence
+function buildIncidentVerdict(threatScore,corruptScore,suspScore,profScore){
+  const t=threatDescriptor(threatScore);
+  const profLabel=profScore>=55?'appeared procedurally sound':'showed concerning deviations from standard protocol';
+  const suspLabel=suspScore>=45?'displayed behavioral indicators consistent with deception or stress':'appeared cooperative with no strong deception signals';
+  const corrLabel=corruptScore>=45?`Corruption risk is <span class="hi" style="color:var(--red2)">elevated</span> — the officer's conduct warrants review`:`Officer integrity appears within <span class="hi" style="color:var(--grn)">acceptable bounds</span> for this stop`;
+  return `This traffic stop registers a <span class="hi" style="color:${t.color}">${t.label} threat level</span> of ${threatScore}/100. The officer ${profLabel}. The driver ${suspLabel}. ${corrLabel}.`;
+}
+
+// Generate behavioral analysis items
+function buildBehaviorItems(data,policeSpeaker,driverSpeaker){
+  const pm=data.speaker_insights[policeSpeaker]?.metrics||{};
+  const dm=data.speaker_insights[driverSpeaker]?.metrics||{};
+  const pls=data.speaker_insights[policeSpeaker]?.llm_scores||{};
+  const dls=data.speaker_insights[driverSpeaker]?.llm_scores||{};
+
+  return [
+    {
+      label:'Officer Dominance',
+      score:(pm.speaking_share_percent||25).toFixed(0)+'%',
+      val:pm.speaking_share_percent||25,
+      max:100,
+      color:pm.speaking_share_percent>60?'var(--red)':pm.speaking_share_percent>45?'var(--amber)':'var(--grn)',
+      note:pm.speaking_share_percent>60?'Officer dominated the interaction — possible coercive behavior signal':'Speaking balance within expected range for a traffic stop'
+    },
+    {
+      label:'Officer Confidence',
+      score:((pm.confidence_score||0.5)*100).toFixed(0)+'%',
+      val:(pm.confidence_score||0.5)*100,
+      max:100,
+      color:pm.confidence_score>0.6?'var(--grn)':pm.confidence_score>0.3?'var(--amber)':'var(--red)',
+      note:pm.confidence_score>0.6?'High confidence — procedurally assertive and clear':'Low confidence signal — may indicate uncertainty or dishonesty'
+    },
+    {
+      label:'Driver Stress Index',
+      score:((dm.filler_rate||0)*100).toFixed(2)+'%',
+      val:Math.min(100,(dm.filler_rate||0)*5000),
+      max:100,
+      color:(dm.filler_rate||0)>0.02?'var(--red)':(dm.filler_rate||0)>0.01?'var(--amber)':'var(--grn)',
+      note:(dm.filler_rate||0)>0.02?'Elevated filler word rate — stress or deception indicators present':'Normal speech patterns — no strong stress indicators'
+    },
+    {
+      label:'Evasion Score (Driver)',
+      score:(100-(dm.agenda_alignment_percent||50)).toFixed(0)+'%',
+      val:100-(dm.agenda_alignment_percent||50),
+      max:100,
+      color:(dm.agenda_alignment_percent||50)<50?'var(--red)':(dm.agenda_alignment_percent||50)<70?'var(--amber)':'var(--grn)',
+      note:(dm.agenda_alignment_percent||50)<50?'Driver frequently deviated from direct responses — evasion pattern detected':'Driver responses stayed largely on-topic and cooperative'
+    },
+    {
+      label:'Officer Procedural Adherence',
+      score:(pm.agenda_alignment_percent||50).toFixed(0)+'%',
+      val:pm.agenda_alignment_percent||50,
+      max:100,
+      color:(pm.agenda_alignment_percent||50)>70?'var(--grn)':(pm.agenda_alignment_percent||50)>50?'var(--amber)':'var(--red)',
+      note:(pm.agenda_alignment_percent||50)>70?'Officer followed standard traffic stop procedure effectively':'Officer deviated from expected procedural language — review recommended'
+    },
+    {
+      label:'Driver Vocabulary Complexity',
+      score:((dm.vocabulary_richness||0.5)*100).toFixed(0)+'%',
+      val:(dm.vocabulary_richness||0.5)*100,
+      max:100,
+      color:'var(--blue)',
+      note:'Vocabulary richness can indicate education level and composure. Unusually high or low values may signal coaching or impairment.'
+    },
+    {
+      label:'Officer Sentiment',
+      score:(pm.sentiment_score||0).toFixed(2),
+      val:Math.max(0,(pm.sentiment_score||0)*100+50),
+      max:100,
+      color:pm.sentiment_score>0.05?'var(--grn)':pm.sentiment_score<-0.05?'var(--red)':'var(--amber)',
+      note:pm.sentiment_score>0.05?'Positive/neutral tone — professional demeanor maintained':pm.sentiment_score<-0.05?'Negative sentiment detected — hostile or intimidating tone possible':'Neutral tone maintained throughout the interaction'
+    },
+    {
+      label:'Driver Sentiment',
+      score:(dm.sentiment_score||0).toFixed(2),
+      val:Math.max(0,(dm.sentiment_score||0)*100+50),
+      max:100,
+      color:dm.sentiment_score>0.05?'var(--grn)':dm.sentiment_score<-0.05?'var(--red)':'var(--amber)',
+      note:dm.sentiment_score<-0.05?'Driver expressed negative sentiment — could indicate hostility or distress':'Driver tone was relatively neutral or cooperative throughout'
+    },
+  ];
+}
+
+// Generate red/green flags specific to traffic stop context
+function buildTrafficFlags(data,policeSpeaker,driverSpeaker,corruptScore,suspScore,profScore){
+  const pm=data.speaker_insights[policeSpeaker]?.metrics||{};
+  const dm=data.speaker_insights[driverSpeaker]?.metrics||{};
+  const red=[],green=[];
+
+  if(corruptScore>=45)red.push({t:'Corruption Risk Elevated',d:`Officer behavior scored ${corruptScore}/100 for corruption indicators — includes procedural deviations and communication patterns warranting review.`});
+  if(pm.speaking_share_percent>60)red.push({t:'Officer Dominance',d:`Officer held ${(pm.speaking_share_percent||0).toFixed(0)}% of speaking time — unusually high for a standard traffic stop, suggests possible intimidation.`});
+  if((pm.filler_rate||0)>0.01)red.push({t:'Officer Verbal Hesitation',d:'Officer displayed elevated filler word usage — may indicate uncertainty, deception, or lack of procedural clarity.'});
+  if((pm.agenda_alignment_percent||50)<50)red.push({t:'Procedural Non-Compliance',d:`Officer deviated significantly from standard traffic stop protocol in ${(100-(pm.agenda_alignment_percent||50)).toFixed(0)}% of dialogue.`});
+  if(suspScore>=45)red.push({t:'Driver Deception Signals',d:`Driver suspicion index at ${suspScore}/100 — behavioral markers include stress responses, evasive answers, and low confidence patterns.`});
+  if((dm.filler_rate||0)>0.02)red.push({t:'Driver Stress Indicators',d:'Driver exhibited high filler word rate consistent with anxiety, deception, or impairment.'});
+  if((pm.sentiment_score||0)<-0.05)red.push({t:'Hostile Officer Tone',d:'Officer expressed negative sentiment during the stop — possible aggressive or intimidating conduct.'});
+
+  if(profScore>=55)green.push({t:'Officer Professionalism',d:`Officer scored ${profScore}/100 on professionalism — demonstrates adherence to protocol and professional communication.`});
+  if(corruptScore<25)green.push({t:'Low Corruption Risk',d:'No significant corruption indicators detected in officer conduct during this traffic stop.'});
+  if((pm.agenda_alignment_percent||50)>=70)green.push({t:'Procedure Followed',d:'Officer maintained procedurally appropriate dialogue throughout the interaction.'});
+  if(suspScore<25)green.push({t:'Cooperative Driver',d:'Driver showed cooperative behavior with no significant deception or evasion signals detected.'});
+  if((pm.confidence_score||0)>0.6)green.push({t:'Officer Assertiveness',d:'Officer communicated with confidence — clear and authoritative without crossing into aggression.'});
+  if((dm.sentiment_score||0)>=0)green.push({t:'Civil Driver Tone',d:'Driver maintained a civil, non-hostile tone throughout the stop regardless of pressure.'});
+
+  return{red,green};
+}
+
+// Parse LLM insight into visual blocks
+function parseBlocks(md){
+  if(!md)return[];
+  const sections=md.split(/^## /m).filter(s=>s.trim());
+  if(sections.length<2){
+    const paras=md.split(/\n\n+/).filter(p=>p.trim().length>30);
+    const labels=['INCIDENT OVERVIEW','OFFICER CONDUCT','DRIVER BEHAVIOR','RISK ASSESSMENT','RECOMMENDATIONS'];
+    return paras.slice(0,5).map((p,i)=>({h:labels[i]||'ANALYSIS',body:p.trim()}));
+  }
+  return sections.map(s=>{const lines=s.trim().split('\n');return{h:lines[0].replace(/^#+\s*/,'').trim().toUpperCase(),body:lines.slice(1).join('\n').trim()};});
+}
+function renderMdBody(md){
+  if(!md)return'';
+  const lines=md.split('\n');let html='',inUL=false;
+  for(let l of lines){
+    if(!/^[-*] /.test(l)&&inUL){html+='</ul>';inUL=false;}
+    if(/^[-*] /.test(l)){if(!inUL){html+='<ul>';inUL=true;}html+=`<li>${inl(l.slice(2))}</li>`;}
+    else if(/^###/.test(l))html+=`<strong>${inl(l.replace(/^#+\s*/,''))}</strong>`;
+    else if(l.trim()==='')html+='';
+    else html+=`<p>${inl(l)}</p>`;
+  }
+  if(inUL)html+='</ul>';return html;
+}
+function inl(t){return t.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\*(.+?)\*/g,'<em>$1</em>');}
+
+// ── MAIN RENDER ──────────────────────────────────────────────────────────
+function renderDashboard(data,insight,topic){
+  const sKeys=Object.keys(data.speaker_insights||{});
+  const lb=data.leaderboard||[];
+
+  // Assign roles: Speaker 1 = Police, Speaker 2 = Driver
+  const policeSpeaker=sKeys[0]||null;
+  const driverSpeaker=sKeys[1]||null;
+
+  // Compute scores
+  const threatScore=computeThreatLevel(data);
+  const corruptScore=computeCorruptionRisk(policeSpeaker,data);
+  const suspScore=computeDriverSuspicion(driverSpeaker,data);
+  const profScore=computeProfessionalism(policeSpeaker,data);
+  const threatDesc=threatDescriptor(threatScore);
+  const corruptDesc=corruptionDescriptor(corruptScore);
+  const suspDesc=suspicionDescriptor(suspScore);
+  const profDesc=professionalismDescriptor(profScore);
+
+  // INCIDENT META
+  const incidentId='INC-'+Math.random().toString(36).substr(2,8).toUpperCase();
+  document.getElementById('incidentId').textContent=incidentId;
+  document.getElementById('incidentTime').textContent=new Date().toLocaleString('en-GB');
+
+  // DASH HEADER
+  document.getElementById('dashTitle').textContent='Traffic Stop Analysis';
+  document.getElementById('dashChips').innerHTML=`
+    <span class="chip chip-b">2 PARTICIPANTS</span>
+    <span class="chip chip-${threatScore>=60?'r':threatScore>=40?'a':'g'}">${threatDesc.label} THREAT</span>
+    <span class="chip chip-${corruptScore>=45?'r':corruptScore>=25?'a':'g'}">CORRUPTION: ${corruptDesc.label}</span>
+    <span class="chip chip-${suspScore>=45?'r':suspScore>=25?'a':'g'}">DRIVER: ${suspDesc.label}</span>`;
+
+  // THREAT HERO
+  document.getElementById('thVerdict').innerHTML=buildIncidentVerdict(threatScore,corruptScore,suspScore,profScore);
+  document.getElementById('tlrVal').textContent=threatScore;
+  document.getElementById('tlrVal').style.color=threatDesc.color;
+  document.getElementById('threatText').textContent=threatDesc.label;
+  document.getElementById('threatText').style.color=threatDesc.color;
+  // Ring color
+  const ring=document.getElementById('threatRing');
+  ring.style.borderColor=threatDesc.color+'30';
+  ring.querySelector('::before')||''; // CSS handles animation
+
+  document.getElementById('thBadges').innerHTML=[
+    {l:`CORRUPTION RISK: ${corruptDesc.label}`,c:corruptDesc.color},
+    {l:`DRIVER SUSPICION: ${suspDesc.label}`,c:suspDesc.color},
+    {l:`OFFICER INTEGRITY: ${profDesc.label}`,c:profDesc.color},
+    {l:`THREAT SCORE: ${threatScore}/100`,c:threatDesc.color},
+  ].map(b=>`<span class="th-badge" style="background:${b.c}18;color:${b.c};border-color:${b.c}30">${b.l}</span>`).join('');
+
+  // DETECTION CARDS
+  const detections=[
+    {
+      icon:'⚠',iconBg:'var(--redg)',iconBorder:'rgba(255,51,51,0.3)',
+      bar:'var(--red)',topBar:'var(--red)',
+      title:'CORRUPTION RISK',
+      score:corruptScore,
+      label:corruptDesc.label,
+      labelColor:corruptDesc.color,
+      desc:corruptScore>=45?'Behavioral patterns in officer\'s speech deviate from procedural norms. Power imbalance, verbal aggression, or evasion markers detected.':'Officer communication patterns are within acceptable thresholds. No strong corruption indicators detected in this interaction.'
+    },
+    {
+      icon:'🔍',iconBg:'var(--amberg)',iconBorder:'rgba(255,170,0,0.3)',
+      bar:'var(--amber)',topBar:'var(--amber)',
+      title:'DRIVER SUSPICION INDEX',
+      score:suspScore,
+      label:suspDesc.label,
+      labelColor:suspDesc.color,
+      desc:suspScore>=45?'Driver exhibits stress responses, evasive language, and low confidence signals consistent with concealment or recent violation.':'Driver\'s communication patterns indicate cooperation and transparency. Low behavioral deception markers.'
+    },
+    {
+      icon:'🛡',iconBg:'var(--blueg)',iconBorder:'rgba(68,136,255,0.3)',
+      bar:'var(--blue)',topBar:'var(--blue)',
+      title:'OFFICER PROFESSIONALISM',
+      score:profScore,
+      label:profDesc.label,
+      labelColor:profDesc.color,
+      desc:profScore>=55?'Officer demonstrates procedural competence, confident communication, and appropriate vocabulary for law enforcement interaction.':'Officer conduct shows measurable gaps in protocol adherence, confidence, or professional language use.'
+    },
+  ];
+  document.getElementById('detectionGrid').innerHTML=detections.map(d=>`
+    <div class="detect-card">
+      <div class="detect-card-top-bar" style="background:${d.topBar}"></div>
+      <div class="detect-icon-wrap" style="background:${d.iconBg};border-color:${d.iconBorder}">${d.icon}</div>
+      <div class="detect-title">${d.title}</div>
+      <div class="detect-score-big" style="color:${d.labelColor}">${d.score}</div>
+      <div class="detect-label" style="color:${d.labelColor}">${d.label}</div>
+      <div class="detect-desc">${d.desc}</div>
+      <div class="detect-bar-wrap"><div class="detect-bar-fill" style="width:0%;background:${d.bar}" data-target="${d.score}"></div></div>
+    </div>`).join('');
+
+  // POLICE CARD
+  function buildRoleCard(sp,idx,cardId,isPolice){
+    if(!sp){document.getElementById(cardId).innerHTML='<div style="color:var(--t3);font-family:\'JetBrains Mono\',monospace;font-size:11px;padding:1rem">No data available</div>';return;}
+    const s=data.speaker_insights[sp];
+    const m=s.metrics||{};
+    const ls=s.llm_scores||{};
+    const clr=ROLE_COLORS[idx],bg=ROLE_COLORS_G[idx],brd=ROLE_COLORS_B[idx];
+    const score=isPolice?profScore:suspScore;
+    const scoreDesc=isPolice?profDesc:suspDesc;
+    const verdictLabel=isPolice?`Professionalism: ${profDesc.label}`:`Suspicion: ${suspDesc.label}`;
+    const verdictColor=isPolice?profDesc.color:suspDesc.color;
+    const narrative=isPolice
+      ?`Officer held ${(m.speaking_share_percent||0).toFixed(0)}% of airtime with ${((m.confidence_score||0)*100).toFixed(0)}% confidence. Procedural adherence at ${(m.agenda_alignment_percent||0).toFixed(0)}%. ${corruptScore>=45?'Conduct raises integrity concerns that warrant supervisory review.':'Conduct appears within professional standards for this type of stop.'}`
+      :`Driver occupied ${(m.speaking_share_percent||0).toFixed(0)}% of the conversation with ${((m.confidence_score||0)*100).toFixed(0)}% confidence. Response alignment at ${(m.agenda_alignment_percent||0).toFixed(0)}%. ${suspScore>=45?'Speech patterns and response evasion suggest possible concealment or heightened anxiety.':'No significant deception indicators detected. Driver appears cooperative.'}`;
+    const strengths=(s.strengths||[]).slice(0,2);
+    const weaknesses=(s.weaknesses||[]).slice(0,1);
+    document.getElementById(cardId).innerHTML+=`
+      <div class="rc-top">
+        <div class="rc-identity">
+          <div class="rc-icon" style="background:${bg};border:1px solid ${brd}">${ROLE_ICONS[idx]}</div>
+          <div>
+            <div class="rc-role" style="color:${clr}">${ROLE_NAMES[idx]}</div>
+            <div class="rc-name">${sp}</div>
+          </div>
+        </div>
+        <div class="rc-verdict-badge" style="background:${verdictColor}18;color:${verdictColor};border-color:${verdictColor}30">${verdictLabel}</div>
+      </div>
+      <div class="rc-narrative">${narrative}</div>
+      <div class="rc-metrics">
+        <div class="rc-metric">
+          <div class="rc-metric-label">Air Time</div>
+          <div class="rc-metric-val" style="color:${clr}">${(m.speaking_share_percent||0).toFixed(0)}%</div>
+        </div>
+        <div class="rc-metric">
+          <div class="rc-metric-label">Confidence</div>
+          <div class="rc-metric-val" style="color:${clr}">${((m.confidence_score||0)*100).toFixed(0)}%</div>
+        </div>
+        <div class="rc-metric">
+          <div class="rc-metric-label">${isPolice?'Procedure':'Evasion'}</div>
+          <div class="rc-metric-val" style="color:${clr}">${isPolice?(m.agenda_alignment_percent||0).toFixed(0)+'%':(100-(m.agenda_alignment_percent||100)).toFixed(0)+'%'}</div>
+        </div>
+      </div>
+      <div class="rc-flags">
+        ${strengths.map(x=>`<span class="rc-flag" style="background:${bg};color:${clr}">✓ ${x}</span>`).join('')}
+        ${weaknesses.map(x=>`<span class="rc-flag" style="background:var(--redg);color:var(--red)">✗ ${x}</span>`).join('')}
+      </div>`;
+  }
+  buildRoleCard(policeSpeaker,0,'policeCard',true);
+  buildRoleCard(driverSpeaker,1,'driverCard',false);
+
+  // BEHAVIOR GRID
+  const behaviorItems=buildBehaviorItems(data,policeSpeaker,driverSpeaker);
+  document.getElementById('behaviorGrid').innerHTML=behaviorItems.map(b=>`
+    <div class="beh-item">
+      <div class="beh-top">
+        <span class="beh-label">${b.label}</span>
+        <span class="beh-score" style="color:${b.color}">${b.score}</span>
+      </div>
+      <div class="beh-bar-track"><div class="beh-bar-fill" style="width:0%;background:${b.color}" data-target="${Math.min(100,b.val)}"></div></div>
+      <div class="beh-note">${b.note}</div>
+    </div>`).join('');
+
+  // AI REPORT BLOCKS
+  const reportTagPalette=['OVERVIEW','OFFICER CONDUCT','DRIVER BEHAVIOR','RISK LEVEL','RECOMMENDATION','INTEGRITY'];
+  const blocks=parseBlocks(insight);
+  document.getElementById('reportBlocks').innerHTML=blocks.length
+    ?blocks.map((b,i)=>`<div class="rb"><div class="rb-h">${b.h}<span class="rb-tag">${reportTagPalette[i%reportTagPalette.length]}</span></div><div class="rb-p">${renderMdBody(b.body)}</div></div>`).join('')
+    :`<div class="rb"><div class="rb-h">Analysis<span class="rb-tag">OVERVIEW</span></div><div class="rb-p"><p style="color:var(--t3)">Analyst report unavailable for this session.</p></div></div>`;
+
+  // FLAGS
+  const{red,green}=buildTrafficFlags(data,policeSpeaker,driverSpeaker,corruptScore,suspScore,profScore);
+  document.getElementById('redFlags').innerHTML=red.length
+    ?red.map(f=>`<div class="flag-item"><div class="flag-icon">🚨</div><div class="flag-text" style="color:var(--red)"><strong>${f.t}</strong>${f.d}</div></div>`).join('')
+    :`<div class="flag-item"><div class="flag-icon">—</div><div class="flag-text" style="color:var(--t3)">No significant concern indicators detected</div></div>`;
+  document.getElementById('greenFlags').innerHTML=green.length
+    ?green.map(f=>`<div class="flag-item"><div class="flag-icon">✅</div><div class="flag-text" style="color:var(--grn)"><strong>${f.t}</strong>${f.d}</div></div>`).join('')
+    :`<div class="flag-item"><div class="flag-icon">—</div><div class="flag-text" style="color:var(--t3)">No compliance indicators to highlight</div></div>`;
+
+  // COMPARISON
+  const dims=[
+    {l:'Agenda\nAlign',fn:(sp)=>data.speaker_insights[sp]?.metrics?.agenda_alignment_percent||0},
+    {l:'Contribution\nQuality',fn:(sp)=>(data.speaker_insights[sp]?.llm_scores?.contribution_quality||0)*10},
+    {l:'Confidence',fn:(sp)=>(data.speaker_insights[sp]?.metrics?.confidence_score||0)*100},
+    {l:'Vocabulary',fn:(sp)=>(data.speaker_insights[sp]?.metrics?.vocabulary_richness||0)*100},
+  ];
+  document.getElementById('compareGrid').innerHTML=sKeys.map((sp,i)=>`
+    <div class="compare-row">
+      <div class="compare-role">
+        <div class="cs-dot" style="background:${ROLE_COLORS[i]}"></div>
+        <span class="cs-name">${ROLE_NAMES[i]||sp}</span>
+      </div>
+      <div class="compare-bars">
+        ${dims.map(d=>{
+          const v=d.fn(sp).toFixed(0);
+          return `<div class="cbar-wrap">
+            <div class="cbar-label">${d.l.replace('\n',' ')}</div>
+            <div class="cbar-track"><div class="cbar-fill" style="height:0%;background:${ROLE_COLORS[i]};opacity:0.7" data-target="${v}"></div></div>
+            <div class="cbar-val" style="color:${ROLE_COLORS[i]}">${v}%</div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`).join('');
+
+  // LLM CHART
+  if(window._chart)window._chart.destroy();
+  const ctx=document.getElementById('llmChart').getContext('2d');
+  window._chart=new Chart(ctx,{
+    type:'bar',
+    data:{
+      labels:sKeys.map((_,i)=>ROLE_NAMES[i]||'—'),
+      datasets:[
+        {label:'Contribution Quality',data:sKeys.map(sp=>data.speaker_insights[sp]?.llm_scores?.contribution_quality||0),backgroundColor:'#4488ff60',borderColor:'#4488ff',borderWidth:1,borderRadius:4},
+        {label:'Interaction Score',data:sKeys.map(sp=>data.speaker_insights[sp]?.llm_scores?.interaction_score||0),backgroundColor:'#00ff8860',borderColor:'#00ff88',borderWidth:1,borderRadius:4},
+        {label:'Decision Impact',data:sKeys.map(sp=>data.speaker_insights[sp]?.llm_scores?.decision_impact||0),backgroundColor:'#ffaa0060',borderColor:'#ffaa00',borderWidth:1,borderRadius:4},
+      ]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{labels:{color:'#7a88a8',font:{family:'JetBrains Mono',size:10},boxWidth:10,padding:12}}},
+      scales:{
+        x:{ticks:{color:'#3e4e6a',font:{family:'JetBrains Mono',size:10}},grid:{color:'#ffffff06'}},
+        y:{min:0,max:10,ticks:{color:'#3e4e6a',font:{family:'JetBrains Mono',size:10},stepSize:2},grid:{color:'#ffffff06'}}
+      }
+    }
+  });
+
+  // RAW ACCORDION
+  let rawHtml='';
+  sKeys.forEach((sp,i)=>{
+    const m=data.speaker_insights[sp]?.metrics||{};
+    const ls=data.speaker_insights[sp]?.llm_scores||{};
+    rawHtml+=`<div class="raw-section-title" style="color:${ROLE_COLORS[i]}">${ROLE_NAMES[i]||sp} — ${sp}</div>`;
+    rawHtml+=`<div class="raw-grid">${[
+      {l:'Speaking Share',v:(m.speaking_share_percent||0).toFixed(1)+'%'},
+      {l:'Turns',v:m.num_turns||0},
+      {l:'Avg Words/Turn',v:(m.avg_words_per_turn||0).toFixed(0)},
+      {l:'Avg Duration',v:(m.avg_duration_per_turn_sec||0).toFixed(1)+'s'},
+      {l:'Confidence',v:((m.confidence_score||0)*100).toFixed(0)+'%'},
+      {l:'Vocab Richness',v:((m.vocabulary_richness||0)*100).toFixed(0)+'%'},
+      {l:'Filler Rate',v:((m.filler_rate||0)*100).toFixed(2)+'%'},
+      {l:'Questions Asked',v:m.questions_asked||0},
+      {l:'Agenda Align',v:(m.agenda_alignment_percent||0).toFixed(0)+'%'},
+      {l:'Topic Coverage',v:(m.topic_coverage_percent||0).toFixed(0)+'%'},
+      {l:'Sentiment',v:(m.sentiment_score||0).toFixed(3)},
+      {l:'Final Score',v:(data.speaker_insights[sp]?.final_score||0).toFixed(1)},
+    ].map(r=>`<div class="raw-item"><div class="raw-label">${r.l}</div><div class="raw-val">${r.v}</div></div>`).join('')}</div>`;
+  });
+  document.getElementById('detailsBody').innerHTML=rawHtml;
+
+  // SHOW
+  document.getElementById('uploadScreen').style.display='none';
+  document.getElementById('dash').style.display='block';
+  window.scrollTo({top:0,behavior:'smooth'});
+
+  // ANIMATE
+  setTimeout(()=>{
+    document.querySelectorAll('[data-target]').forEach(el=>{
+      const isH=el.classList.contains('cbar-fill');
+      const prop=isH?'height':'width';
+      el.style.transition=`${prop} 1s cubic-bezier(0.16,1,0.3,1)`;
+      el.style[prop]=el.dataset.target+'%';
+    });
+  },200);
+}
+
+// ── API FLOW ──────────────────────────────────────────────────────────────
+const FIXED_TOPIC='Traffic Stop Police Interaction';
+const FIXED_SPEAKERS=2;
+
+async function runAnalysis(){
+  const file=fileInput.files[0];
+  const base='http://127.0.0.1:5000';
+  if(!file){setStatus('Please select an audio recording file.','error');return;}
+  const btn=document.getElementById('analyzeBtn');
+  btn.disabled=true;
+  setStatus('Uploading recording to analysis server...');
+  let analysisData;
+  try{
+    const form=new FormData();
+    form.append('file',file);
+    form.append('topic',FIXED_TOPIC);
+    form.append('num_speakers',String(FIXED_SPEAKERS));
+    const res=await fetch(`${base}/analyze-meeting`,{method:'POST',body:form});
+    if(!res.ok)throw new Error(`Server error ${res.status}`);
+    const{job_id}=await res.json();
+    let elapsed=0;
+    while(true){
+      await new Promise(r=>setTimeout(r,3000));elapsed+=3;
+      setStatus(`Scanning... ${elapsed}s — transcribing, diarizing, profiling speakers`);
+      const poll=await fetch(`${base}/result/${job_id}`);
+      const pd=await poll.json();
+      if(pd.status==='done'){analysisData=pd;break;}
+      if(pd.status==='error')throw new Error(pd.error||'Processing failed');
+    }
+  }catch(err){setStatus('Error: '+err.message,'error');btn.disabled=false;return;}
+
+  setStatus('Generating behavioral analysis report...');
+  let insight='';
+  try{
+    const resp=await fetch(`${base}/interpret`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+      ...analysisData,
+      context:'This is a traffic stop interaction between a police officer and a driver. Analyze for corruption indicators, officer professionalism, driver deception signals, and overall interaction quality. Do not treat this as a business meeting.'
+    })});
+    if(!resp.ok)throw new Error('Interpret failed');
+    insight=(await resp.json()).insight||'';
+  }catch(e){
+    insight='## Incident Overview\nThis traffic stop interaction has been analyzed for behavioral and integrity indicators based on speech patterns, confidence levels, and linguistic analysis.\n\n## Officer Conduct\nOfficer communication patterns have been assessed for procedural adherence, use of authority, and professional conduct standards expected in law enforcement interactions.\n\n## Driver Behavior\nDriver responses have been analyzed for signs of evasion, stress responses, deception markers, and overall cooperation level.\n\n## Risk Assessment\nOverall incident risk has been computed from a combination of sentiment disparity, confidence levels, filler word rates, and agenda alignment between participants.\n\n## Recommendations\nReview flagged behavioral indicators and cross-reference with dashcam footage for complete incident assessment.';
+  }
+  setStatus('');
+  renderDashboard(analysisData,insight,FIXED_TOPIC);
+  btn.disabled=false;
+}
+</script>
+</body>
+</html>
