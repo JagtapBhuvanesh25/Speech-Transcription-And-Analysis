@@ -11,7 +11,8 @@ import logging
 import threading
 import tempfile
 
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
+from flask_cors import CORS
 from werkzeug.utils import secure_filename
 from groq import Groq
 
@@ -31,8 +32,9 @@ logger = logging.getLogger(__name__)
 if not os.getenv("GROQ_API_KEY"):
     raise RuntimeError("GROQ_API_KEY environment variable is not set.")
 
-# ── Flask app ─────────────────────────────────────────────────────────────────
+# ── Flask app (defined ONCE) ──────────────────────────────────────────────────
 app = Flask(__name__)
+CORS(app)
 
 UPLOAD_FOLDER = "uploads_api"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -168,6 +170,12 @@ def _process_job(job_id: str, filepath: str, topic: str, num_speakers):
 
 # ── Routes ────────────────────────────────────────────────────────────────────
 
+@app.route("/", methods=["GET"])
+def index():
+    """Serve the frontend HTML."""
+    return send_from_directory(".", "meeting_intelligence.html")
+
+
 @app.route("/health", methods=["GET"])
 def health():
     return jsonify({"status": "running"})
@@ -246,6 +254,47 @@ def get_result(job_id: str):
 
     # done
     return jsonify({"job_id": job_id, "status": "done", **job["result"]}), 200
+
+
+# ── Interpret route ───────────────────────────────────────────────────────────
+
+@app.route("/interpret", methods=["POST"])
+def interpret():
+    """Takes analysis JSON, returns LLM business insight using Groq."""
+    data = request.get_json(force=True)
+    client = Groq()
+
+    system_prompt = (
+        "You are given the output of an automated meeting analysis system. "
+        "This includes metrics, speaker performance, rankings, summary, and transcript.\n\n"
+        "Your task is to interpret this data like a human business analyst.\n"
+        "Do not repeat the data. Do not describe the metrics individually.\n\n"
+        "Instead, focus on:\n"
+        "- What actually happened in the meeting\n"
+        "- How effective the meeting was\n"
+        "- Who contributed meaningfully vs who didn't\n"
+        "- Whether the discussion led to real outcomes or just debate\n"
+        "- Any imbalance in participation or dominance\n"
+        "- The overall business value of the meeting\n"
+        "- Clear, practical suggestions to improve future meetings\n\n"
+        "Think critically and infer insights from the data rather than restating it.\n"
+        "Respond in a clear, professional, business-oriented manner using markdown headings (##) and bullet points where appropriate."
+    )
+
+    try:
+        completion = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            max_tokens=1500,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user",   "content": str(data)}
+            ]
+        )
+        insight = completion.choices[0].message.content
+        return jsonify({"insight": insight})
+    except Exception as e:
+        logger.exception("Interpret route error")
+        return jsonify({"error": str(e)}), 500
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────
