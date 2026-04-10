@@ -293,10 +293,6 @@ class SpeakerDiarizer:
 
         return "\n".join(lines).strip()
 
-    # ---------------------------
-    # MAIN ENTRY POINT
-    # ---------------------------
-
     def diarize(self, input_path: str, num_speakers: int | None = None):
         """
         Full pipeline: convert → transcribe → embed → (auto-detect or cluster)

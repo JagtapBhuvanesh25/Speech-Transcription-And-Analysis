@@ -13,17 +13,8 @@ logger = logging.getLogger(__name__)
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 client = Groq(api_key=GROQ_API_KEY)
 
-# ---------------------------
-# CONSTANTS
-# ---------------------------
-
 FILLER_WORDS = {"um", "uh", "like", "you know", "basically", "actually"}
 
-
-# ---------------------------
-# RETRY DECORATOR
-# Mirrors the one in main.py — kept local so metrics.py stays self-contained.
-# ---------------------------
 
 def _with_retry(max_attempts=3, initial_delay=2.0, backoff=2.0, exceptions=(Exception,)):
     def decorator(fn):
@@ -48,11 +39,6 @@ def _with_retry(max_attempts=3, initial_delay=2.0, backoff=2.0, exceptions=(Exce
         return wrapper
     return decorator
 
-
-# ---------------------------
-# HELPERS
-# ---------------------------
-
 def tokenize(text: str) -> list:
     return re.findall(r"\b\w+\b", text.lower())
 
@@ -62,21 +48,18 @@ def _parse_topic_json(raw: str, num_segments: int) -> dict:
     Repair and parse the JSON object returned by the topic-relevance LLM call.
     Falls back to a neutral score dict (0.5 for all segments) on total failure.
     """
-    # Strip markdown fences
+
     if "```" in raw:
         parts = raw.split("```")
         raw = parts[1].lstrip("json").strip() if len(parts) > 1 else raw
 
     scores = None
 
-    # Attempt 1: direct parse
     try:
         scores = json.loads(raw)
     except json.JSONDecodeError:
         pass
 
-    # Attempt 2: fix unquoted integer keys (0: 0.8 → "0": 0.8)
-    #            and trailing commas (,}) which LLMs commonly produce
     if scores is None:
         try:
             fixed = re.sub(r"(\b\d+)\s*:", r'"\1":', raw)   # quote keys
@@ -85,7 +68,6 @@ def _parse_topic_json(raw: str, num_segments: int) -> dict:
         except json.JSONDecodeError:
             pass
 
-    # Attempt 3: extract outermost {...} block
     if scores is None:
         try:
             start = raw.index("{")
@@ -107,10 +89,6 @@ def _parse_topic_json(raw: str, num_segments: int) -> dict:
             safe[str(k)] = 0.5
     return safe
 
-
-# ---------------------------
-# CORE METRICS (unchanged logic, logging only)
-# ---------------------------
 
 def compute_speaker_metrics(segments: list) -> dict:
     speaker_data = defaultdict(lambda: {
@@ -223,10 +201,6 @@ def confidence_score(segments: list) -> dict:
     }
 
 
-# ---------------------------
-# TOPIC METRICS — now retried
-# ---------------------------
-
 @_with_retry(max_attempts=3, initial_delay=2.0, exceptions=(Exception,))
 def topic_metrics(segments: list, topic: str) -> dict:
     """
@@ -268,7 +242,6 @@ def topic_metrics(segments: list, topic: str) -> dict:
 
     scores = _parse_topic_json(raw, len(segments))
 
-    # Aggregate per speaker
     speaker_data: dict = {}
     for i, seg in enumerate(segments):
         sp = seg["speaker"]
@@ -290,11 +263,6 @@ def topic_metrics(segments: list, topic: str) -> dict:
         }
 
     return final
-
-
-# ---------------------------
-# FINAL SCORE (unchanged)
-# ---------------------------
 
 def compute_final_scores(metrics: dict, analysis: dict) -> dict:
     speaker_scores = analysis.get("speaker_scores", {})
@@ -332,11 +300,6 @@ def compute_final_scores(metrics: dict, analysis: dict) -> dict:
             for i, (sp, sc) in enumerate(ranking)
         ],
     }
-
-
-# ---------------------------
-# EXPLANATIONS (unchanged)
-# ---------------------------
 
 def generate_explanations(metrics: dict, analysis: dict) -> dict:
     speaker_scores = analysis.get("speaker_scores", {})
@@ -378,11 +341,6 @@ def generate_explanations(metrics: dict, analysis: dict) -> dict:
         }
 
     return explanations
-
-
-# ---------------------------
-# MAIN WRAPPER
-# ---------------------------
 
 def compute_all_metrics(segments: list, topic: str) -> dict:
     if not segments:
